@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual de Usuario - SyncAccesible (Versión 2.0 C++ Nativo)</title>
+  <style>
+    :root {
+      --bg-color: #fcfcfc;
+      --text-color: #1a1a1a;
+      --heading-color: #0d47a1;
+      --card-bg: #ffffff;
+      --border-color: #d1d5db;
+      --link-color: #0277bd;
+      --focus-ring: #ff6f00;
+      --table-header-bg: #e3f2fd;
+      --table-stripe: #f8fafc;
+      --kbd-bg: #f3f4f6;
+      --kbd-border: #9ca3af;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #121820;
+        --text-color: #f1f5f9;
+        --heading-color: #90caf9;
+        --card-bg: #1e2632;
+        --border-color: #374151;
+        --link-color: #64b5f6;
+        --focus-ring: #ffb300;
+        --table-header-bg: #1a365d;
+        --table-stripe: #17212d;
+        --kbd-bg: #2d3748;
+        --kbd-border: #64748b;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.65;
+      color: var(--text-color);
+      background-color: var(--bg-color);
+      margin: 0;
+      padding: 0 1rem 3rem 1rem;
+    }
+
+    .skip-link {
+      position: absolute;
+      top: -40px;
+      left: 10px;
+      background: var(--heading-color);
+      color: #ffffff;
+      padding: 8px 16px;
+      text-decoration: none;
+      font-weight: bold;
+      z-index: 100;
+      border-radius: 4px;
+    }
+
+    .skip-link:focus {
+      top: 10px;
+      outline: 3px solid var(--focus-ring);
+    }
+
+    header, main, footer, nav {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 2.5rem 0 1.5rem 0;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    h1 {
+      color: var(--heading-color);
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+      line-height: 1.25;
+    }
+
+    .metadata {
+      font-size: 1.05rem;
+      color: var(--text-color);
+      opacity: 0.9;
+      margin-bottom: 0.5rem;
+    }
+
+    nav.toc {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.5rem 2rem;
+      margin: 2rem auto;
+    }
+
+    nav.toc h2 {
+      margin-top: 0;
+      font-size: 1.4rem;
+      color: var(--heading-color);
+    }
+
+    nav.toc ol {
+      padding-left: 1.5rem;
+      margin-bottom: 0;
+    }
+
+    nav.toc li {
+      margin-bottom: 0.4rem;
+    }
+
+    h2 {
+      color: var(--heading-color);
+      font-size: 1.6rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.4rem;
+      margin-top: 2.5rem;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      color: var(--heading-color);
+      margin-top: 1.8rem;
+    }
+
+    p, li {
+      font-size: 1.05rem;
+    }
+
+    ul, ol {
+      padding-left: 1.6rem;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    kbd {
+      background: var(--kbd-bg);
+      border: 1px solid var(--kbd-border);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      box-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.95em;
+      padding: 0.15rem 0.45rem;
+      white-space: nowrap;
+    }
+
+    a {
+      color: var(--link-color);
+      text-decoration: underline;
+    }
+
+    a:focus, button:focus {
+      outline: 3px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    caption {
+      text-align: left;
+      font-weight: bold;
+      font-size: 1.15rem;
+      margin-bottom: 0.5rem;
+      color: var(--heading-color);
+    }
+
+    th, td {
+      padding: 0.85rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      background-color: var(--table-header-bg);
+      font-size: 1.05rem;
+    }
+
+    tr:nth-child(even) td {
+      background-color: var(--table-stripe);
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-left: 5px solid var(--heading-color);
+      border-radius: 6px;
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    footer {
+      border-top: 2px solid var(--border-color);
+      margin-top: 3.5rem;
+      padding-top: 1.5rem;
+      text-align: center;
+      font-size: 0.95rem;
+      opacity: 0.85;
+    }
+  </style>
+</head>
+<body>
+
+  <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
+  <header>
+    <h1>Manual de Usuario - SyncAccesible (Versión 2.0 C++ Nativo)</h1>
+    <div class="metadata">
+      <p><strong>Autor y Desarrollador:</strong> José Manuel Fernández Cortés<br>
+      <strong>Año:</strong> 2026 | <strong>Licencia:</strong> Libre y Código Abierto</p>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Índice de contenidos">
+    <h2>📖 Índice de Contenidos</h2>
+    <ol>
+      <li><a href="#introduccion">Introducción y Filosofía de Diseño Accesible</a></li>
+      <li><a href="#requisitos">Requisitos e Instalación</a></li>
+      <li><a href="#estructura">Estructura de la Interfaz</a></li>
+      <li><a href="#gestion-pares">Gestión de Pares de Carpetas</a></li>
+      <li><a href="#modos-sync">Modos de Sincronización</a></li>
+      <li><a href="#invertir-pares">Invertir Pares de Carpetas</a></li>
+      <li><a href="#comparacion">Comparación y Vista Previa (Filtro y Ordenación)</a></li>
+      <li><a href="#puntero-virtual">Puntero Virtual de Columnas</a></li>
+      <li><a href="#feedback">Sistema de Feedback Accesible (Barra, Sonido y Voz)</a></li>
+      <li><a href="#informes-log">Exportación de Informes y Diagnóstico (.log)</a></li>
+      <li><a href="#serie-lotes">Ejecución en Serie y Cola de Lotes</a></li>
+      <li><a href="#bandeja">Bandeja del Sistema y Minimización</a></li>
+      <li><a href="#atajos">Tabla Completa de Atajos de Teclado</a></li>
+      <li><a href="#creditos">Créditos y Dedicatoria</a></li>
+    </ol>
+  </nav>
+
+  <main id="contenido-principal">
+
+    <section id="introduccion">
+      <h2>1. Introducción y Filosofía de Diseño Accesible</h2>
+      <p><strong>SyncAccesible</strong> es una herramienta gráfica de sincronización de archivos y carpetas desarrollada por <strong>José Manuel Fernández Cortés</strong> para el sistema operativo Windows.</p>
+      <p>A diferencia de las utilidades convencionales de sincronización, SyncAccesible ha sido diseñada y construida desde su núcleo bajo un principio rector: <strong>la accesibilidad universal total</strong>. Está optimizada para personas usuarias de lectores de pantalla (como NVDA y JAWS) y personas que operan exclusivamente mediante el teclado, sin descuidar una interfaz gráfica limpia, clara y visualmente cómoda para usuarios videntes.</p>
+
+      <div class="card">
+        <h3>Características Principales:</h3>
+        <ul>
+          <li><strong>Ejecutable nativo en C++ de alto rendimiento:</strong> Sin dependencias externas pesadas, con arranque en menos de 20 milisegundos y uso mínimo de memoria RAM (2 a 4 MB).</li>
+          <li><strong>Integración con lectores de pantalla:</strong> Soporte directo nativo con la API <code>nvdaControllerClient</code> y sintetizadores SAPI de Windows.</li>
+          <li><strong>Navegación sin barreras:</strong> Todas las funciones, botones, diálogos, menús contextuales y selecciones son operables al 100% mediante atajos de teclado estándar.</li>
+          <li><strong>Puntero Virtual de Columnas:</strong> Permite inspeccionar celda a celda cada atributo horizontalmente con las flechas Izquierda y Derecha sin perder la fila seleccionada.</li>
+          <li><strong>Feedback multisensorial:</strong> Barra de progreso visible suave, latido sonoro periódico de espera y anuncios de voz automáticos cada 25% de progreso.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="requisitos">
+      <h2>2. Requisitos e Instalación</h2>
+      <ul>
+        <li><strong>Sistema Operativo:</strong> Windows 10 o Windows 11 (32 o 64 bits).</li>
+        <li><strong>Portabilidad:</strong> No requiere instalación en el sistema. Puede ejecutarse directamente desde cualquier carpeta, disco externo o memoria USB ejecutando <code>SyncAccesible.exe</code>.</li>
+        <li><strong>Archivos asociados:</strong>
+          <ul>
+            <li><code>SyncAccesible.exe</code>: Aplicación ejecutable principal (apenas 290 KB).</li>
+            <li><code>config.json</code>: Archivo de configuración general y proyectos recientes.</li>
+            <li><code>MANUAL.html</code> y <code>MANUAL.md</code>: Manuales de usuario accesibles.</li>
+            <li><code>nvdaControllerClient64.dll</code> / <code>nvdaControllerClient32.dll</code>: Librerías de enlace directo con NVDA (opcionales pero recomendadas).</li>
+          </ul>
+        </li>
+      </ul>
+    </section>
+
+    <section id="estructura">
+      <h2>3. Estructura de la Interfaz</h2>
+      <p>La ventana principal de SyncAccesible se divide de forma clara en cuatro zonas lógicas:</p>
+      <ol>
+        <li><strong>Barra de Menús Superior:</strong>
+          <ul>
+            <li><strong>Archivo (<kbd>Alt + A</kbd>):</strong> Nuevo proyecto (<kbd>Ctrl + Shift + N</kbd>), Abrir (<kbd>Ctrl + O</kbd>), Guardar (<kbd>Ctrl + S</kbd>), Guardar como (<kbd>Ctrl + Shift + S</kbd>), Exportar Informe (<kbd>Ctrl + P</kbd>) y Cerrar por completo (<kbd>Alt + F4</kbd>).</li>
+            <li><strong>Sincronización (<kbd>Alt + S</kbd>):</strong> Comparar (<kbd>F5</kbd>), Sincronizar (<kbd>F6</kbd>), En serie selección (<kbd>F7</kbd>), Todas en serie (<kbd>Ctrl + F6</kbd>) y Cola de lotes (<kbd>Alt + L</kbd>).</li>
+            <li><strong>Pares de Carpetas (<kbd>Alt + P</kbd>):</strong> Añadir (<kbd>Ctrl + N</kbd>), Editar (<kbd>Ctrl + E</kbd>), Invertir (<kbd>Ctrl + I</kbd>) y Eliminar (<kbd>Supr</kbd>).</li>
+            <li><strong>Ver (<kbd>Alt + V</kbd>):</strong> Pestaña 1 (<kbd>Alt + 1</kbd>), Pestaña 2 (<kbd>Alt + 2</kbd>), Cambiar de pestaña (<kbd>Ctrl + Tab</kbd>), Filtrar solo cambios (<kbd>Ctrl + H</kbd>) y Ordenar por acción (<kbd>Alt + O</kbd>).</li>
+            <li><strong>Herramientas (<kbd>Alt + H</kbd>):</strong> Configuración general y Ver archivo de registro (<kbd>.log</kbd>).</li>
+            <li><strong>Ayuda (<kbd>Alt + Y</kbd>):</strong> Atajos de Teclado (<kbd>Shift + F1</kbd>), Manual de Usuario (<kbd>F1</kbd>) y Acerca de...</li>
+          </ul>
+        </li>
+        <li><strong>Barra de Botones Rápidos:</strong> Botones accesibles de pulsación directa para las tareas más frecuentes.</li>
+        <li><strong>Contenedor de Pestañas:</strong>
+          <ul>
+            <li><strong>Pestaña 1: Pares de Carpetas:</strong> Lista con todos los pares configurados en el proyecto activo.</li>
+            <li><strong>Pestaña 2: Vista Previa de Sincronización:</strong> Lista detallada tras comparar, con acciones pendientes (copiar, borrar, idéntico).</li>
+          </ul>
+        </li>
+        <li><strong>Zona de Progreso y Estado:</strong>
+          <ul>
+            <li><strong>Barra de Progreso Visible:</strong> Muestra el porcentaje completado de 0 a 100%.</li>
+            <li><strong>Barra de Estado:</strong> Informa el número de elementos, tarea en curso y resultado.</li>
+          </ul>
+        </li>
+      </ol>
+    </section>
+
+    <section id="gestion-pares">
+      <h2>4. Gestión de Pares de Carpetas</h2>
+      <p>Un "Par de Carpetas" define una carpeta de <strong>Origen</strong> (Izquierda) y una de <strong>Destino</strong> (Derecha).</p>
+      <ul>
+        <li><strong>Añadir un par (<kbd>Ctrl + N</kbd>):</strong> Abre el diálogo para configurar nombre, rutas izquierda y derecha, modo de sincronización, programaciones automáticas y exclusiones de archivos.</li>
+        <li><strong>Editar un par (<kbd>Ctrl + E</kbd> o <kbd>Enter</kbd>):</strong> Modifica los parámetros del par seleccionado en la lista.</li>
+        <li><strong>Eliminar un par (<kbd>Supr</kbd>):</strong> Solicita confirmación y retira el par del proyecto.</li>
+      </ul>
+    </section>
+
+    <section id="modos-sync">
+      <h2>5. Modos de Sincronización</h2>
+      <ul>
+        <li><strong>Espejo (Mirror):</strong> Hace que la carpeta de destino sea idéntica a la de origen. Copia los archivos nuevos y modificados de origen a destino, y elimina en destino aquellos archivos que ya no existan en el origen.</li>
+        <li><strong>Actualizar (Update):</strong> Copia los archivos nuevos y modificados de origen a destino, pero nunca elimina archivos en destino.</li>
+        <li><strong>Bidireccional (Two-Way):</strong> Examina ambas carpetas y copia los archivos más recientes en cualquiera de los dos lados para mantener ambas carpetas sincronizadas.</li>
+      </ul>
+    </section>
+
+    <section id="invertir-pares">
+      <h2>6. Invertir Pares de Carpetas</h2>
+      <p>SyncAccesible permite intercambiar fácilmente la dirección de un par:</p>
+      <ol>
+        <li><strong>Desde la lista principal:</strong> Selecciona el par y pulsa <kbd>Ctrl + I</kbd>. El sintetizador anunciará: <em>"Par 'nombre' invertido. Origen y destino intercambiados."</em></li>
+        <li><strong>Desde el diálogo de edición:</strong> Pulsa el botón <kbd>Invertir Carpetas (Alt + I)</kbd>.</li>
+      </ol>
+    </section>
+
+    <section id="comparacion">
+      <h2>7. Comparación y Vista Previa (Filtro y Ordenación)</h2>
+      <p>Antes de sincronizar, puedes comprobar qué cambios se realizarán:</p>
+      <ul>
+        <li>Pulsa <kbd>F5</kbd> sobre el par seleccionado para iniciar la comparación.</li>
+        <li>La aplicación analiza los archivos de ambas carpetas de forma segura en segundo plano.</li>
+        <li>Al finalizar, pasa automáticamente a la <strong>Pestaña 2 (Vista Previa)</strong> y verbaliza el resumen de cambios detectados.</li>
+      </ul>
+
+      <h3>Filtrado y Ordenación Inteligente para Grandes Volúmenes:</h3>
+      <p>Cuando una carpeta contiene decenas de miles de archivos, la inmensa mayoría suelen ser idénticos. Para garantizar fluidez máxima y rapidez de respuesta:</p>
+      <ul>
+        <li><strong>Filtrar solo cambios (<kbd>Ctrl + H</kbd>):</strong> Por defecto, la vista previa solo muestra los archivos que van a ser copiados, eliminados o actualizados, ocultando los idénticos. Puedes alternar este filtro en cualquier momento desde el menú <code>Ver -&gt; Filtrar solo cambios</code> o pulsando <kbd>Ctrl + H</kbd>.</li>
+        <li><strong>Ordenar por Acción (<kbd>Alt + O</kbd>):</strong> Prioriza en los primeros lugares los archivos con acciones pendientes (conflictos, copias a destino, actualizaciones y borrados). También disponible en el menú contextual y menú <code>Ver -&gt; Ordenar por -&gt; Acción requerida</code>.</li>
+        <li><strong>Ordenar por Columnas:</strong> Puedes hacer clic en la cabecera de las columnas (Acción, Archivo Relativo, Tamaño) para ordenar alfabéticamente o por peso.</li>
+      </ul>
+    </section>
+
+    <section id="puntero-virtual">
+      <h2>8. Puntero Virtual de Columnas</h2>
+      <p>Tanto en la lista de Pares de Carpetas como en la Vista Previa:</p>
+      <ul>
+        <li>Con las <strong>Flechas Arriba y Abajo</strong> seleccionas el elemento o fila.</li>
+        <li>Con las <strong>Flechas Izquierda y Derecha</strong> navegas horizontalmente por las columnas de esa fila.</li>
+        <li>El lector de pantalla anuncia de forma fluida el encabezado y el valor de cada celda (<em>"Modo: Espejo"</em>, <em>"Programación: Diaria 22:00"</em>, <em>"Tamaño Origen: 4.5 MB"</em>), sin mover el foco de fila ni perder la posición.</li>
+      </ul>
+    </section>
+
+    <section id="feedback">
+      <h2>9. Sistema de Feedback Accesible</h2>
+      <p>Para garantizar una experiencia informativa completa para personas ciegas o con resto visual:</p>
+      <ol>
+        <li><strong>Barra de Progreso Visible:</strong> Ubicada sobre la barra de estado, avanza de 0% a 100% de manera suave y continua durante comparaciones y sincronizaciones.</li>
+        <li><strong>Sonido de Espera (Latido de Operación):</strong> Durante el proceso se emite un latido sonoro suave cada 1.2 segundos, ofreciendo certeza acústica inmediata de que la aplicación continúa procesando sin bloquearse.</li>
+        <li><strong>Anuncio por Voz cada 25%:</strong> El sintetizador verbaliza automáticamente los hitos de progreso:
+          <ul>
+            <li><strong>25 por ciento</strong></li>
+            <li><strong>50 por ciento</strong></li>
+            <li><strong>75 por ciento</strong></li>
+            <li>Y al terminar, verbaliza el resultado completo detallado.</li>
+          </ul>
+        </li>
+        <li><strong>Alerta sonora de finalización:</strong> Emite un tono del sistema al completarse la tarea.</li>
+        <li><strong>Detección de errores detallada:</strong> Si un archivo no se puede copiar por permisos o bloqueo, el sintetizador anuncia el nombre del archivo y la causa, situando el foco directamente en él en la Vista Previa y abriendo un cuadro de diálogo accesible con sugerencias para resolverlo.</li>
+      </ol>
+    </section>
+
+    <section id="informes-log">
+      <h2>10. Exportación de Informes y Diagnóstico (.log)</h2>
+      <h3>Exportar Informe de Resultados a TXT (<kbd>Ctrl + P</kbd>):</h3>
+      <p>Permite generar en cualquier momento un informe en formato <code>.txt</code> con los resultados de la comparación o sincronización:</p>
+      <ul>
+        <li>Menú <strong>Archivo -&gt; Exportar Informe de Resultados a TXT...</strong> o pulsa <kbd>Ctrl + P</kbd>.</li>
+        <li>Se genera un archivo de texto estructurado en UTF-8 con fecha, par analizado, rutas, estadísticas y la lista clasificada de archivos.</li>
+        <li>La aplicación ofrece abrirlo directamente en el Bloc de Notas.</li>
+      </ul>
+
+      <h3>Sistema de Registro y Diagnóstico (<kbd>sync_accesible.log</kbd>):</h3>
+      <p>Para prevenir fallos o situaciones de bloqueo:</p>
+      <ul>
+        <li>Todas las operaciones de escaneo, sincronización y posibles excepciones del sistema quedan registradas con marca de tiempo precisa en <code>sync_accesible.log</code>.</li>
+        <li>El archivo de registro utiliza un modo de acceso compartido y atómico que nunca queda retenido por la aplicación.</li>
+        <li>Puedes inspeccionar el registro en cualquier momento desde el menú <strong>Herramientas -&gt; Ver Archivo de Registro (.log)...</strong>.</li>
+      </ul>
+    </section>
+
+    <section id="serie-lotes">
+      <h2>11. Ejecución en Serie y Cola de Lotes</h2>
+      <p>Para no saturar el rendimiento del disco ni el ancho de banda, SyncAccesible procesa las tareas en riguroso orden secuencial:</p>
+      <ul>
+        <li><strong>Sincronizar Selección en Serie (<kbd>F7</kbd>):</strong> Permite seleccionar varios pares con <kbd>Shift + Flechas</kbd> o <kbd>Ctrl + Espacio</kbd> y pulsar <kbd>F7</kbd>. Se sincronizará el primer par y, al terminar, el segundo, y así sucesivamente.</li>
+        <li><strong>Sincronizar Todos en Serie (<kbd>Ctrl + F6</kbd>):</strong> Procesa uno tras otro todos los pares activos del proyecto.</li>
+        <li><strong>Cola de Lotes (<kbd>Alt + L</kbd>):</strong> Permite encadenar múltiples proyectos diferentes, añadir pares, cambiar el orden de ejecución con los botones Subir y Bajar, y supervisar el progreso global.</li>
+      </ul>
+    </section>
+
+    <section id="bandeja">
+      <h2>12. Bandeja del Sistema y Minimización</h2>
+      <ul>
+        <li><strong>Minimizar con <kbd>Esc</kbd>:</strong> Al pulsar <kbd>Esc</kbd> desde la ventana principal, la aplicación se oculta en la bandeja del sistema para seguir trabajando en segundo plano.</li>
+        <li><strong>Acceso desde el lector de pantalla (<kbd>Windows + B</kbd>):</strong>
+          <ol>
+            <li>Pulsa <kbd>Windows + B</kbd> para enfocar la bandeja del sistema.</li>
+            <li>Si está en <strong>Mostrar iconos ocultos (<kbd>^</kbd>)</strong>, pulsa <kbd>Enter</kbd> o <kbd>Espacio</kbd> y navega con las flechas hasta <strong>SyncAccesible (C++)</strong>.</li>
+            <li>Pulsa <kbd>Enter</kbd> o <kbd>Espacio</kbd> para restaurar la ventana al instante.</li>
+            <li>Pulsa la <kbd>Tecla Aplicaciones</kbd> o <kbd>Shift + F10</kbd> para abrir el menú de la bandeja.</li>
+          </ol>
+        </li>
+      </ul>
+    </section>
+
+    <section id="atajos">
+      <h2>13. Tabla Completa de Atajos de Teclado</h2>
+      <p>Pulsa <kbd>Shift + F1</kbd> en cualquier momento dentro de la aplicación para abrir una ventana rápida con todos estos atajos.</p>
+
+      <table summary="Tabla con los atajos de teclado de SyncAccesible y la función que ejecutan">
+        <caption>Atajos de Teclado de SyncAccesible</caption>
+        <thead>
+          <tr>
+            <th scope="col" style="width: 30%;">Atajo de Teclado</th>
+            <th scope="col">Función / Acción Realizada</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>Shift + F1</kbd></td>
+            <td><strong>Abrir la ventana rápida con todos los Atajos de Teclado</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>F1</kbd></td>
+            <td><strong>Abrir el Manual de Usuario en HTML en el navegador web</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>F5</kbd></td>
+            <td>Comparar el par de carpetas seleccionado</td>
+          </tr>
+          <tr>
+            <td><kbd>F6</kbd></td>
+            <td>Sincronizar el par seleccionado</td>
+          </tr>
+          <tr>
+            <td><kbd>F7</kbd></td>
+            <td>Sincronizar en serie los pares seleccionados (uno tras otro)</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + F6</kbd></td>
+            <td>Sincronizar todos los pares activos del proyecto en serie</td>
+          </tr>
+          <tr>
+            <td><kbd>Alt + L</kbd></td>
+            <td>Abrir la Cola de Lotes para múltiples proyectos</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + P</kbd></td>
+            <td><strong>Exportar informe de resultados a fichero .txt</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + H</kbd></td>
+            <td><strong>Alternar filtro en Vista Previa (solo cambios / todos)</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>Alt + O</kbd></td>
+            <td><strong>Ordenar Vista Previa por acción requerida</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + N</kbd></td>
+            <td>Añadir un nuevo par de carpetas al proyecto</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + E</kbd> / <kbd>Enter</kbd></td>
+            <td>Editar el par de carpetas seleccionado</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + I</kbd></td>
+            <td>Invertir el par seleccionado (Origen &lt;-&gt; Destino)</td>
+          </tr>
+          <tr>
+            <td><kbd>Supr (Delete)</kbd></td>
+            <td>Eliminar el par seleccionado</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + O</kbd></td>
+            <td>Abrir archivo de Proyecto (.syncproj)</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + S</kbd></td>
+            <td>Guardar Proyecto actual</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + Shift + S</kbd></td>
+            <td>Guardar Proyecto Como...</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + Shift + N</kbd></td>
+            <td>Nuevo Proyecto limpio</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + Tab</kbd></td>
+            <td>Alternar entre Pestaña 1 y Pestaña 2</td>
+          </tr>
+          <tr>
+            <td><kbd>Alt + 1</kbd> / <kbd>Ctrl + 1</kbd></td>
+            <td>Ir a la Pestaña 1 (Pares de Carpetas)</td>
+          </tr>
+          <tr>
+            <td><kbd>Alt + 2</kbd> / <kbd>Ctrl + 2</kbd></td>
+            <td>Ir a la Pestaña 2 (Vista Previa de Sincronización)</td>
+          </tr>
+          <tr>
+            <td><kbd>Flecha Izquierda / Derecha</kbd></td>
+            <td><strong>Puntero Virtual de Columnas:</strong> anuncia celda por celda sin mover el foco de fila</td>
+          </tr>
+          <tr>
+            <td><kbd>Shift + F10</kbd> / <kbd>Tecla Aplicaciones</kbd></td>
+            <td>Abrir menú contextual del elemento seleccionado</td>
+          </tr>
+          <tr>
+            <td><kbd>Tab</kbd> / <kbd>Shift + Tab</kbd></td>
+            <td>Desplazarse entre controles, listas y botones</td>
+          </tr>
+          <tr>
+            <td><kbd>Esc</kbd></td>
+            <td>Minimizar la aplicación a la bandeja del sistema</td>
+          </tr>
+          <tr>
+            <td><kbd>Alt + F4</kbd></td>
+            <td>Cerrar y salir por completo de la aplicación</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="creditos">
+      <h2>14. Créditos</h2>
+      <p><strong>Desarrollo y Diseño de Accesibilidad:</strong> José Manuel Fernández Cortés<br>
+      <strong>Año:</strong> 2026<br>
+      <strong>Dedicatoria:</strong> Creado con especial dedicación para la comunidad hispanohablante con discapacidad visual, promoviendo el software libre, accesible y sin barreras.</p>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>SyncAccesible 2.0 (C++ Nativo) &copy; 2026 José Manuel Fernández Cortés. Software Libre y Accesible.</p>
+  </footer>
+
+</body>
+</html>
+
