@@ -18,9 +18,10 @@ g++ -std=c++17 -O2 -s -mwindows -municode ^
     src/scheduler.cpp ^
     src/speech.cpp ^
     src/logger.cpp ^
+    src/updater.cpp ^
     resource.res ^
     -o SyncAccesible.exe ^
-    -lcomctl32 -lshlwapi -lole32 -loleaut32 -luuid -lshell32
+    -lcomctl32 -lshlwapi -lole32 -loleaut32 -luuid -lshell32 -lwininet -lwinmm
 
 if errorlevel 1 (
     echo Error en la compilacion de C++.

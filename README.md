@@ -92,6 +92,8 @@ Accesible desde el menú **Herramientas > Configuración General** o mediante el
 | :--- | :--- |
 | **Shift + F1** | **Ventana rápida con todos los Atajos de Teclado (copiable al portapapeles)** |
 | **F1** | **Abrir el Manual de Usuario en HTML navegable por encabezados, listas y tablas** |
+| **Ctrl + U** | **Buscar Actualizaciones de SyncAccesible en línea (automático o manual)** |
+| **Ctrl + D / F2** | **Ficha de Atributos del Elemento (tabla accesible vertical para JAWS, NVDA, Narrador)** |
 | **Ctrl + Shift + N** | Nuevo Proyecto |
 | **Ctrl + O** | Abrir archivo de Proyecto (`.syncproj`) |
 | **Ctrl + S** | Guardar Proyecto actual |

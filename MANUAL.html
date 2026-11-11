@@ -251,11 +251,12 @@
       <div class="card">
         <h3>Características Principales:</h3>
         <ul>
-          <li><strong>Ejecutable nativo en C++ de alto rendimiento:</strong> Sin dependencias externas pesadas, con arranque en menos de 20 milisegundos y uso mínimo de memoria RAM (2 a 4 MB).</li>
-          <li><strong>Integración con lectores de pantalla:</strong> Soporte directo nativo con la API <code>nvdaControllerClient</code> y sintetizadores SAPI de Windows.</li>
+          <li><strong>Ejecutable nativo en C++ de alto rendimiento:</strong> Sin dependencias externas pesadas, con arranque instantáneo y uso mínimo de memoria RAM (2 a 4 MB).</li>
+          <li><strong>Soporte universal para lectores de pantalla:</strong> Compatibilidad directa con <strong>NVDA</strong> (<code>nvdaControllerClient</code>), <strong>JAWS</strong> (vía API COM oficial <code>FreedomSci.JawsApi</code>), <strong>Dolphin SuperNova</strong> (<code>dolapi.dll</code>) y sintetizadores <strong>SAPI 5</strong> de Windows con hilos dedicados.</li>
           <li><strong>Navegación sin barreras:</strong> Todas las funciones, botones, diálogos, menús contextuales y selecciones son operables al 100% mediante atajos de teclado estándar.</li>
-          <li><strong>Puntero Virtual de Columnas:</strong> Permite inspeccionar celda a celda cada atributo horizontalmente con las flechas Izquierda y Derecha sin perder la fila seleccionada.</li>
+          <li><strong>Puntero Virtual y Ficha de Atributos:</strong> Inspecciona columnas horizontalmente con las flechas Izquierda y Derecha, o abre la <strong>Ficha de Atributos (<kbd>Ctrl + D</kbd> o <kbd>F2</kbd>)</strong> en una tabla vertical de dos columnas accesible para cualquier lector de pantalla.</li>
           <li><strong>Feedback multisensorial:</strong> Barra de progreso visible suave, latido sonoro periódico de espera y anuncios de voz automáticos cada 25% de progreso.</li>
+          <li><strong>Actualizaciones Seguras (<kbd>Ctrl + U</kbd>):</strong> Comprobación automática o manual y actualización transaccional conservando intacta tu configuración y proyectos.</li>
         </ul>
       </div>
     </section>
@@ -445,6 +446,14 @@
           <tr>
             <td><kbd>F1</kbd></td>
             <td><strong>Abrir el Manual de Usuario en HTML en el navegador web</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + U</kbd></td>
+            <td><strong>Buscar Actualizaciones de SyncAccesible en línea</strong></td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl + D</kbd> / <kbd>F2</kbd></td>
+            <td><strong>Ficha de Atributos del Elemento (tabla accesible vertical para JAWS, NVDA, Narrador)</strong></td>
           </tr>
           <tr>
             <td><kbd>F5</kbd></td>

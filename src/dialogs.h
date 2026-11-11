@@ -20,6 +20,8 @@ void ShowAboutDialog(HWND hwndParent);
 void ShowManualDialog(HWND hwndParent);
 void OpenManualHtml(HWND hwndParent);
 void ShowShortcutsDialog(HWND hwndParent);
+void ShowItemPropertiesDialog(HWND hwndParent, const std::wstring& title, const std::vector<std::pair<std::wstring, std::wstring>>& properties);
+void ShowUpdateDialog(HWND hwndParent, const void* pUpdateInfo);
 
 } // namespace Dialogs
 

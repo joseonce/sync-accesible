@@ -16,7 +16,10 @@ void StopWaitingBeep();
 void SetEnabled(bool enabled);
 bool IsEnabled();
 
+bool IsScreenReaderActive();
+bool IsJawsActive();
+bool IsNvdaActive();
+
 } // namespace Speech
 
 #endif // SPEECH_H
-

@@ -3,6 +3,7 @@
 #include "sync_engine.h"
 #include "speech.h"
 #include "logger.h"
+#include "updater.h"
 #include <commctrl.h>
 #include <shlobj.h>
 #include <commdlg.h>
@@ -1482,6 +1483,471 @@ void ShowShortcutsDialog(HWND hwndParent) {
         nullptr,
         hInst,
         nullptr
+    );
+
+    EnableWindow(hwndParent, FALSE);
+    MSG msg;
+    while (GetMessageW(&msg, nullptr, 0, 0)) {
+        if (!IsDialogMessageW(hwndDlg, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+    EnableWindow(hwndParent, TRUE);
+    SetForegroundWindow(hwndParent);
+}
+
+// -------------------------------------------------------------
+// FICHA DE ATRIBUTOS (TABLA / PROPIEDADES ACCESIBLES)
+// -------------------------------------------------------------
+struct ItemPropertiesData {
+    std::wstring title;
+    std::vector<std::pair<std::wstring, std::wstring>> properties;
+};
+
+#define IDC_PROPERTIES_LIST 7001
+#define IDC_PROPERTIES_COPY 7002
+
+static WNDPROC g_pOrigPropListProc = nullptr;
+
+static LRESULT CALLBACK PropListSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_KEYDOWN) {
+        if (wParam == VK_LEFT || wParam == VK_RIGHT) {
+            ItemPropertiesData* pData = (ItemPropertiesData*)GetWindowLongPtrW(GetParent(hwnd), GWLP_USERDATA);
+            if (pData) {
+                int sel = ListView_GetNextItem(hwnd, -1, LVNI_SELECTED);
+                if (sel >= 0 && sel < (int)pData->properties.size()) {
+                    if (wParam == VK_LEFT) {
+                        Speech::Speak(L"Propiedad: " + pData->properties[sel].first);
+                    } else {
+                        Speech::Speak(L"Valor: " + pData->properties[sel].second);
+                    }
+                }
+            }
+            return 0;
+        } else if (wParam == VK_ESCAPE) {
+            PostMessageW(GetParent(hwnd), WM_COMMAND, MAKEWPARAM(IDCANCEL, 0), 0);
+            return 0;
+        }
+    }
+    return CallWindowProcW(g_pOrigPropListProc, hwnd, msg, wParam, lParam);
+}
+
+static LRESULT CALLBACK ItemPropertiesDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_CREATE: {
+            CREATESTRUCTW* cs = (CREATESTRUCTW*)lParam;
+            ItemPropertiesData* pData = (ItemPropertiesData*)cs->lpCreateParams;
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)pData);
+
+            HFONT hFont = GetAppFont();
+            HFONT hBoldFont = CreateFontW(
+                -16, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI"
+            );
+
+            HWND hTitle = CreateWindowExW(0, L"STATIC", pData->title.c_str(), WS_CHILD | WS_VISIBLE, 15, 12, 730, 24, hwnd, nullptr, GetModuleHandleW(nullptr), nullptr);
+            SendMessageW(hTitle, WM_SETFONT, (WPARAM)hBoldFont, TRUE);
+
+            HWND hDesc = CreateWindowExW(0, L"STATIC", L"Navegue verticalmente con Flechas Arriba/Abajo para leer cada propiedad. Flechas Izq/Der para inspeccionar celda por celda.", WS_CHILD | WS_VISIBLE, 15, 38, 730, 20, hwnd, nullptr, GetModuleHandleW(nullptr), nullptr);
+            SendMessageW(hDesc, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            HWND hList = CreateWindowExW(
+                WS_EX_CLIENTEDGE,
+                WC_LISTVIEWW,
+                L"",
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS,
+                15, 65, 735, 385,
+                hwnd,
+                (HMENU)IDC_PROPERTIES_LIST,
+                GetModuleHandleW(nullptr),
+                nullptr
+            );
+            SendMessageW(hList, WM_SETFONT, (WPARAM)hFont, TRUE);
+            ListView_SetExtendedListViewStyle(hList, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER);
+
+            LVCOLUMNW lvc = {0};
+            lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
+            lvc.cx = 240;
+            lvc.pszText = (LPWSTR)L"Propiedad / Campo";
+            ListView_InsertColumn(hList, 0, &lvc);
+
+            lvc.cx = 475;
+            lvc.pszText = (LPWSTR)L"Valor";
+            ListView_InsertColumn(hList, 1, &lvc);
+
+            for (size_t i = 0; i < pData->properties.size(); ++i) {
+                LVITEMW lvi = {0};
+                lvi.mask = LVIF_TEXT;
+                lvi.iItem = (int)i;
+                lvi.iSubItem = 0;
+                lvi.pszText = (LPWSTR)pData->properties[i].first.c_str();
+                ListView_InsertItem(hList, &lvi);
+                ListView_SetItemText(hList, (int)i, 1, (LPWSTR)pData->properties[i].second.c_str());
+            }
+
+            g_pOrigPropListProc = (WNDPROC)SetWindowLongPtrW(hList, GWLP_WNDPROC, (LONG_PTR)PropListSubclassProc);
+
+            // Buttons
+            HWND hBtnCopy = CreateWindowExW(0, L"BUTTON", L"&Copiar al Portapapeles", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 15, 465, 190, 32, hwnd, (HMENU)IDC_PROPERTIES_COPY, GetModuleHandleW(nullptr), nullptr);
+            SendMessageW(hBtnCopy, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            HWND hBtnClose = CreateWindowExW(0, L"BUTTON", L"&Cerrar", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, 640, 465, 110, 32, hwnd, (HMENU)IDCANCEL, GetModuleHandleW(nullptr), nullptr);
+            SendMessageW(hBtnClose, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            if (!pData->properties.empty()) {
+                ListView_SetItemState(hList, 0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+            }
+            SetFocus(hList);
+
+            std::wstring announce = L"Ficha de atributos abierta: " + pData->title + L". " + std::to_wstring(pData->properties.size()) + L" propiedades. Navegue con flechas arriba y abajo.";
+            Speech::Speak(announce);
+            return 0;
+        }
+        case WM_NOTIFY: {
+            NMHDR* pnm = (NMHDR*)lParam;
+            if (pnm->idFrom == IDC_PROPERTIES_LIST && pnm->code == LVN_ITEMCHANGED) {
+                ItemPropertiesData* pData = (ItemPropertiesData*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+                if (pData) {
+                    NMLISTVIEW* pnmv = (NMLISTVIEW*)lParam;
+                    if ((pnmv->uNewState & LVIS_SELECTED) && !(pnmv->uOldState & LVIS_SELECTED)) {
+                        int sel = pnmv->iItem;
+                        if (sel >= 0 && sel < (int)pData->properties.size()) {
+                            std::wstring text = pData->properties[sel].first + L": " + pData->properties[sel].second;
+                            Speech::Speak(text);
+                        }
+                    }
+                }
+            }
+            return 0;
+        }
+        case WM_COMMAND: {
+            int id = LOWORD(wParam);
+            if (id == IDC_PROPERTIES_COPY) {
+                ItemPropertiesData* pData = (ItemPropertiesData*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+                if (pData) {
+                    std::wstring fullText = L"=== " + pData->title + L" ===\r\n\r\n";
+                    for (const auto& kv : pData->properties) {
+                        fullText += kv.first + L": " + kv.second + L"\r\n";
+                    }
+                    CopyTextToClipboard(hwnd, fullText);
+                    Speech::Speak(L"Ficha de atributos copiada al portapapeles.");
+                    MessageBoxW(hwnd, L"Ficha de atributos copiada al portapapeles con éxito.", L"SyncAccesible", MB_OK | MB_ICONINFORMATION);
+                }
+            } else if (id == IDOK || id == IDCANCEL) {
+                DestroyWindow(hwnd);
+            }
+            return 0;
+        }
+        case WM_CLOSE: {
+            DestroyWindow(hwnd);
+            return 0;
+        }
+        case WM_DESTROY: {
+            PostQuitMessage(0);
+            return 0;
+        }
+    }
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
+}
+
+void ShowItemPropertiesDialog(HWND hwndParent, const std::wstring& title, const std::vector<std::pair<std::wstring, std::wstring>>& properties) {
+    static bool registered = false;
+    HINSTANCE hInst = GetModuleHandleW(nullptr);
+    if (!registered) {
+        WNDCLASSEXW wc = { sizeof(WNDCLASSEXW) };
+        wc.lpfnWndProc = ItemPropertiesDlgProc;
+        wc.hInstance = hInst;
+        wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+        wc.lpszClassName = L"SyncItemPropertiesDialogClass";
+        RegisterClassExW(&wc);
+        registered = true;
+    }
+
+    ItemPropertiesData data;
+    data.title = title;
+    data.properties = properties;
+
+    RECT rcParent;
+    GetWindowRect(hwndParent, &rcParent);
+    int w = 780, h = 550;
+    int x = rcParent.left + ((rcParent.right - rcParent.left) - w) / 2;
+    int y = rcParent.top + ((rcParent.bottom - rcParent.top) - h) / 2;
+
+    HWND hwndDlg = CreateWindowExW(
+        WS_EX_DLGMODALFRAME,
+        L"SyncItemPropertiesDialogClass",
+        title.c_str(),
+        WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+        x, y, w, h,
+        hwndParent,
+        nullptr,
+        hInst,
+        &data
+    );
+
+    EnableWindow(hwndParent, FALSE);
+    MSG msg;
+    while (GetMessageW(&msg, nullptr, 0, 0)) {
+        if (!IsDialogMessageW(hwndDlg, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+    EnableWindow(hwndParent, TRUE);
+    SetForegroundWindow(hwndParent);
+}
+
+// -------------------------------------------------------------
+// ACTUALIZADOR PORTABLE (DIÁLOGO ACCESIBLE)
+// -------------------------------------------------------------
+struct UpdateDlgData {
+    Updater::UpdateInfo info;
+    HWND hGauge = nullptr;
+    HWND hStatus = nullptr;
+    HWND hBtnUpdate = nullptr;
+    HWND hBtnCancel = nullptr;
+    std::atomic<bool> isDownloading{false};
+    std::atomic<bool> cancelRequested{false};
+};
+
+#define IDC_UPDATE_NOW 8001
+#define WM_UPDATE_PROGRESS (WM_USER + 110)
+#define WM_UPDATE_FINISHED (WM_USER + 111)
+#define WM_UPDATE_ERROR    (WM_USER + 112)
+
+static LRESULT CALLBACK UpdateDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    UpdateDlgData* pData = (UpdateDlgData*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+
+    switch (msg) {
+        case WM_CREATE: {
+            CREATESTRUCTW* cs = (CREATESTRUCTW*)lParam;
+            pData = (UpdateDlgData*)cs->lpCreateParams;
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)pData);
+
+            HFONT hFont = GetAppFont();
+            HFONT hBoldFont = CreateFontW(
+                -16, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI"
+            );
+
+            // Header box
+            HWND hTitle = CreateWindowExW(0, L"STATIC", L"¡Hay una nueva versión disponible de SyncAccesible!", WS_CHILD | WS_VISIBLE, 15, 12, 540, 24, hwnd, nullptr, GetModuleHandleW(nullptr), nullptr);
+            SendMessageW(hTitle, WM_SETFONT, (WPARAM)hBoldFont, TRUE);
+
+            std::wstring verText = L"• Versión disponible: v" + pData->info.version + (pData->info.date.empty() ? L"" : L" (" + pData->info.date + L")") +
+                                   L"\r\n• Versión instalada actualmente: v" + std::wstring(Updater::APP_VERSION);
+            HWND hVers = CreateWindowExW(0, L"STATIC", verText.c_str(), WS_CHILD | WS_VISIBLE, 15, 38, 540, 42, hwnd, nullptr, GetModuleHandleW(nullptr), nullptr);
+            SendMessageW(hVers, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            // Changelog
+            HWND hLblChanges = CreateWindowExW(0, L"STATIC", L"&Novedades de esta versión:", WS_CHILD | WS_VISIBLE, 15, 85, 540, 18, hwnd, nullptr, GetModuleHandleW(nullptr), nullptr);
+            SendMessageW(hLblChanges, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            std::wstring clText;
+            for (const auto& item : pData->info.changelog) {
+                clText += L"• " + item + L"\r\n\r\n";
+            }
+            if (clText.empty()) clText = L"• Mejoras de rendimiento y accesibilidad.";
+
+            HWND hEditCl = CreateWindowExW(
+                WS_EX_CLIENTEDGE, L"EDIT", clText.c_str(),
+                WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_READONLY | WS_TABSTOP | ES_AUTOVSCROLL,
+                15, 106, 540, 160,
+                hwnd, nullptr, GetModuleHandleW(nullptr), nullptr
+            );
+            SendMessageW(hEditCl, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            // Progress bar
+            pData->hGauge = CreateWindowExW(
+                0, PROGRESS_CLASSW, L"",
+                WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
+                15, 276, 540, 20,
+                hwnd, nullptr, GetModuleHandleW(nullptr), nullptr
+            );
+            SendMessageW(pData->hGauge, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
+            SendMessageW(pData->hGauge, PBM_SETPOS, 0, 0);
+
+            // Status label
+            pData->hStatus = CreateWindowExW(
+                0, L"STATIC", L"Pulse 'Actualizar ahora' para descargar e instalar la actualización.",
+                WS_CHILD | WS_VISIBLE,
+                15, 304, 540, 20,
+                hwnd, nullptr, GetModuleHandleW(nullptr), nullptr
+            );
+            SendMessageW(pData->hStatus, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            // Buttons
+            pData->hBtnUpdate = CreateWindowExW(
+                0, L"BUTTON", L"&Actualizar ahora",
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
+                325, 335, 130, 32,
+                hwnd, (HMENU)IDC_UPDATE_NOW, GetModuleHandleW(nullptr), nullptr
+            );
+            SendMessageW(pData->hBtnUpdate, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            pData->hBtnCancel = CreateWindowExW(
+                0, L"BUTTON", L"&Más tarde",
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+                465, 335, 90, 32,
+                hwnd, (HMENU)IDCANCEL, GetModuleHandleW(nullptr), nullptr
+            );
+            SendMessageW(pData->hBtnCancel, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+            SetFocus(pData->hBtnUpdate);
+
+            std::wstring announce = L"Nueva versión " + pData->info.version + L" disponible de SyncAccesible. Tu versión actual es " + std::wstring(Updater::APP_VERSION) + L". Pulse Actualizar ahora o tabulador para ver las novedades.";
+            Speech::Speak(announce);
+            return 0;
+        }
+
+        case WM_UPDATE_PROGRESS: {
+            int pct = (int)wParam;
+            SendMessageW(pData->hGauge, PBM_SETPOS, (WPARAM)pct, 0);
+            std::wstring st = L"Descargando actualización: " + std::to_wstring(pct) + L"% completado...";
+            SetWindowTextW(pData->hStatus, st.c_str());
+
+            if (pct == 25 || pct == 50 || pct == 75) {
+                Speech::Speak(L"Descargando actualización: " + std::to_wstring(pct) + L" por ciento.");
+            }
+            return 0;
+        }
+
+        case WM_UPDATE_FINISHED: {
+            std::wstring* pZip = (std::wstring*)lParam;
+            std::wstring tempZip = *pZip;
+            delete pZip;
+
+            SendMessageW(pData->hGauge, PBM_SETPOS, 100, 0);
+            SetWindowTextW(pData->hStatus, L"¡Descarga completada! Preparando la actualización...");
+            EnableWindow(pData->hBtnCancel, FALSE);
+
+            std::wstring msg = L"La nueva versión de SyncAccesible se ha descargado correctamente.\n\n"
+                               L"La aplicación se cerrará ahora para actualizar los archivos.\n"
+                               L"Al finalizar, SyncAccesible se reiniciará automáticamente.\n"
+                               L"Si ocurriese cualquier fallo, se restaurará la versión anterior.";
+
+            Speech::Speak(L"Descarga completada con éxito. La aplicación se cerrará para aplicar la actualización y se reiniciará automáticamente.");
+            MessageBoxW(hwnd, msg.c_str(), L"Actualización Descargada - SyncAccesible", MB_OK | MB_ICONINFORMATION);
+
+            DestroyWindow(hwnd);
+            Updater::LaunchPortableUpdater(tempZip, hwnd);
+            return 0;
+        }
+
+        case WM_UPDATE_ERROR: {
+            std::wstring* pErr = (std::wstring*)lParam;
+            std::wstring errStr = *pErr;
+            delete pErr;
+
+            pData->isDownloading.store(false);
+            EnableWindow(pData->hBtnUpdate, TRUE);
+            SetWindowTextW(pData->hStatus, L"Error durante la descarga de la actualización.");
+
+            Speech::Speak(L"Se ha producido un error durante la descarga de la actualización.");
+            MessageBoxW(hwnd, (L"No se pudo descargar la nueva versión:\n\n" + errStr).c_str(), L"Error de Actualización", MB_OK | MB_ICONERROR);
+            return 0;
+        }
+
+        case WM_COMMAND: {
+            int id = LOWORD(wParam);
+            if (id == IDC_UPDATE_NOW) {
+                if (pData->isDownloading.load()) return 0;
+                pData->isDownloading.store(true);
+                pData->cancelRequested.store(false);
+                EnableWindow(pData->hBtnUpdate, FALSE);
+
+                SetWindowTextW(pData->hStatus, L"Iniciando descarga de la actualización...");
+                Speech::Speak(L"Iniciando descarga de la nueva versión. Por favor, espere...");
+
+                std::thread([hwnd, pData]() {
+                    wchar_t tempPath[MAX_PATH];
+                    GetTempPathW(MAX_PATH, tempPath);
+                    std::wstring zipDst = std::wstring(tempPath) + L"sync_dl_" + std::to_wstring(GetCurrentProcessId()) + L".zip";
+
+                    std::wstring err;
+                    bool ok = Updater::DownloadUpdatePackage(
+                        pData->info.download_url,
+                        zipDst,
+                        [hwnd](int pct, uint64_t d, uint64_t t) {
+                            PostMessageW(hwnd, WM_UPDATE_PROGRESS, (WPARAM)pct, 0);
+                        },
+                        &pData->cancelRequested,
+                        err
+                    );
+
+                    if (ok) {
+                        PostMessageW(hwnd, WM_UPDATE_FINISHED, 0, (LPARAM)new std::wstring(zipDst));
+                    } else {
+                        PostMessageW(hwnd, WM_UPDATE_ERROR, 0, (LPARAM)new std::wstring(err));
+                    }
+                }).detach();
+            } else if (id == IDCANCEL) {
+                if (pData->isDownloading.load()) {
+                    int res = MessageBoxW(hwnd, L"La descarga de la actualización está en curso.\n¿Desea cancelarla?", L"Cancelar Actualización", MB_YESNO | MB_ICONQUESTION);
+                    if (res != IDYES) return 0;
+                    pData->cancelRequested.store(true);
+                }
+                DestroyWindow(hwnd);
+            }
+            return 0;
+        }
+
+        case WM_CLOSE: {
+            if (pData->isDownloading.load()) {
+                int res = MessageBoxW(hwnd, L"La descarga de la actualización está en curso.\n¿Desea cancelarla?", L"Cancelar Actualización", MB_YESNO | MB_ICONQUESTION);
+                if (res != IDYES) return 0;
+                pData->cancelRequested.store(true);
+            }
+            DestroyWindow(hwnd);
+            return 0;
+        }
+
+        case WM_DESTROY: {
+            PostQuitMessage(0);
+            return 0;
+        }
+    }
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
+}
+
+void ShowUpdateDialog(HWND hwndParent, const void* pUpdateInfo) {
+    if (!pUpdateInfo) return;
+    const Updater::UpdateInfo& info = *(const Updater::UpdateInfo*)pUpdateInfo;
+
+    static bool registered = false;
+    HINSTANCE hInst = GetModuleHandleW(nullptr);
+    if (!registered) {
+        WNDCLASSEXW wc = { sizeof(WNDCLASSEXW) };
+        wc.lpfnWndProc = UpdateDlgProc;
+        wc.hInstance = hInst;
+        wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+        wc.lpszClassName = L"SyncUpdateDialogClass";
+        RegisterClassExW(&wc);
+        registered = true;
+    }
+
+    UpdateDlgData data;
+    data.info = info;
+
+    RECT rcParent;
+    GetWindowRect(hwndParent, &rcParent);
+    int w = 585, h = 420;
+    int x = rcParent.left + ((rcParent.right - rcParent.left) - w) / 2;
+    int y = rcParent.top + ((rcParent.bottom - rcParent.top) - h) / 2;
+
+    HWND hwndDlg = CreateWindowExW(
+        WS_EX_DLGMODALFRAME,
+        L"SyncUpdateDialogClass",
+        L"Nueva Versión Disponible - SyncAccesible",
+        WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+        x, y, w, h,
+        hwndParent,
+        nullptr,
+        hInst,
+        &data
     );
 
     EnableWindow(hwndParent, FALSE);

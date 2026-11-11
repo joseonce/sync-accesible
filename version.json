@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "name": "SyncAccesible v2.0.0",
+  "date": "2026-11-11",
+  "url": "https://github.com/joseonce/sync-accesible/releases/download/v2.0.0/SyncAccesible_v2.0.zip",
+  "changelog": [
+    "Soporte universal para lectores de pantalla: NVDA, JAWS (FreedomSci.JawsApi COM) y Dolphin SuperNova.",
+    "Ficha de atributos accesible (Ctrl+D o F2) para explorar todas las columnas y metadatos con flechas arriba/abajo.",
+    "Sistema de actualizacion automatica segura y transaccional con conservacion de configuracion (Ctrl+U).",
+    "Alertas sonoras y porcentaje por voz cada 25% durante comparaciones y sincronizaciones.",
+    "Filtro con Ctrl+H para visualizar exclusivamente archivos con cambios u ocultar identicos.",
+    "Exportacion de informes de sincronizacion y comparacion a texto plano con Ctrl+P."
+  ]
+}
+

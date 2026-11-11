@@ -33,10 +33,11 @@ A diferencia de las utilidades convencionales de sincronización, SyncAccesible 
 
 ### Características Principales:
 * **Ejecutable nativo en C++ de alto rendimiento:** Sin dependencias externas voluminosas, con arranque instantáneo y uso mínimo de memoria RAM.
-* **Integración con lectores de pantalla:** Soporte directo con `nvdaControllerClient` y sintetizadores SAPI de Windows.
+* **Soporte universal para lectores de pantalla:** Compatibilidad directa con **NVDA** (`nvdaControllerClient`), **JAWS** (a través de la API COM oficial `FreedomSci.JawsApi`), **Dolphin SuperNova** (`dolapi.dll`) y sintetizadores **SAPI 5** de Windows con hilos independientes desacoplados.
 * **Navegación sin barreras:** Todas las funciones, botones, diálogos, menús contextuales y selecciones son operables al 100% por teclado.
-* **Puntero Virtual de Columnas:** Permite inspeccionar celda a celda cada atributo sin mover la selección de la fila.
+* **Puntero Virtual de Columnas y Ficha de Atributos:** Permite inspeccionar celda a celda cada atributo horizontalmente con flechas izquierda/derecha, o abrir una **Ficha de Atributos (`Ctrl + D` o `F2`)** navegable verticalmente con flechas arriba/abajo en una tabla accesible de dos columnas.
 * **Feedback multisensorial durante operaciones:** Barra de progreso gráfica continua, sonido de espera periódico tipo latido y avisos por voz automáticos cada 25% de progreso (25%, 50%, 75% y finalización).
+* **Sistema de Actualizaciones Transaccionales:** Comprobación silenciosa o manual (`Ctrl + U`), descarga en segundo plano con avisos de voz y sustitución atómica conservando intactos tus pares de carpetas y configuración.
 
 ---
 
@@ -115,12 +116,24 @@ Cuando una carpeta contiene miles o cientos de miles de archivos, la mayoría so
 
 ---
 
-## 8. Puntero Virtual de Columnas
+## 8. Lectura de Columnas: Puntero Virtual y Ficha de Atributos
 
-Tanto en la lista de Pares de Carpetas como en la Vista Previa:
-* Con las **Flechas Arriba y Abajo** seleccionas el elemento/fila.
-* Con las **Flechas Izquierda y Derecha** navegas horizontalmente por las columnas de esa fila.
-* El lector de pantalla anuncia de forma fluida el encabezado y el valor de cada celda (*"Modo: Espejo"*, *"Programación: Diaria 22:00"*, *"Tamaño Origen: 4.5 MB"*), sin mover el foco de fila ni perder la posición.
+Para que cualquier persona pueda examinar al detalle todos los atributos de un par o archivo (como fecha, hora, estado, ruta de origen, tamaño en destino, etc.), SyncAccesible proporciona dos métodos complementarios y universales:
+
+### Método 1: Puntero Virtual de Columnas (Flechas Izquierda / Derecha)
+* Con las **Flechas Arriba y Abajo** seleccionas el elemento de la lista.
+* Con las **Flechas Izquierda y Derecha** navegas horizontalmente por las columnas de esa misma fila.
+* Gracias al motor de voz multilector, la aplicación se comunica directamente con:
+  * **NVDA:** Mediante llamadas a `nvdaController_speakText`.
+  * **JAWS:** Mediante la interfaz COM oficial `FreedomSci.JawsApi` ejecutando `SayString` en tiempo real.
+  * **Dolphin SuperNova:** A través de `dolapi.dll`.
+  * **Narrador y otros:** Mediante el subsistema `SAPI 5` y eventos WinEvent `EVENT_OBJECT_NAMECHANGE`.
+* El lector anuncia inmediatamente el encabezado y el valor de cada celda (*"Modo: Espejo"*, *"Programación: Diaria 22:00"*, *"Tamaño Origen: 4.5 MB"*), sin mover el foco de fila ni desorientar la navegación.
+
+### Método 2: Ficha de Atributos Accesible (`Ctrl + D` o `F2` o `Enter` en Vista Previa)
+* Al pulsar **`Ctrl + D`**, **`F2`** o **`Enter`** sobre un elemento, se abre una ventana modal con una tabla de dos columnas: **Propiedad** y **Valor**.
+* En esta ventana, puedes subir y bajar con las **Flechas Arriba y Abajo**. Cualquier lector de pantalla (JAWS, NVDA, Narrador, SuperNova, etc.) leerá la propiedad y su valor de manera estándar y nativa.
+* Además, incorpora un botón rápido **Copiar al Portapapeles (`Alt + C`)** para transferir toda la ficha estructurada con un solo toque, y se cierra limpiamente con **`Esc`** o **`Enter`**.
 
 ---
 
@@ -155,7 +168,22 @@ Para garantizar estabilidad total y prevenir cierres inesperados o estados de "N
 
 ---
 
-## 11. Ejecución en Serie y Cola de Lotes
+## 11. Sistema de Actualizaciones Automáticas Seguras (`Ctrl + U`)
+
+SyncAccesible incluye un gestor de actualizaciones transaccionales inspirado en arquitecturas modernas y robustas:
+* **Comprobación Automática Silenciosa:** Al iniciar la aplicación, se consulta en segundo plano si existe una versión superior en GitHub sin interrumpir el trabajo del usuario.
+* **Comprobación Manual Inmediata (`Ctrl + U`):** Puedes forzar la búsqueda en cualquier momento desde el menú **Ayuda -> Buscar Actualizaciones...** o mediante el atajo `Ctrl + U`.
+* **Diálogo Informativo y Accesible:** Si hay una versión disponible, se presenta una ventana con el número de versión, fecha de publicación, lista desglosada de novedades (*changelog*) y los botones **Actualizar Ahora** y **Cancelar**.
+* **Descarga con Feedback por Voz:** Durante la descarga del paquete `.zip`, el sintetizador anuncia los porcentajes y el volumen transferido.
+* **Actualización Transaccional Segura con Rollback:** La instalación se realiza mediante un script de relevo que:
+  1. Realiza una copia de seguridad temporal previa.
+  2. Extrae los binarios actualizados de forma atómica.
+  3. **Preserva de forma garantizada tu configuración personal (`config.json`), proyectos (`.syncproj`) y registros.**
+  4. Reinicia automáticamente la aplicación en su nueva versión y anuncia la confirmación.
+
+---
+
+## 12. Ejecución en Serie y Cola de Lotes
 
 Para no saturar el rendimiento del disco ni el ancho de banda de red, SyncAccesible ejecuta las tareas en estricto orden secuencial:
 
@@ -165,7 +193,7 @@ Para no saturar el rendimiento del disco ni el ancho de banda de red, SyncAccesi
 
 ---
 
-## 12. Bandeja del Sistema y Minimización
+## 13. Bandeja del Sistema y Minimización
 
 * **Minimizar con `Esc`:** Al pulsar `Esc` desde la ventana principal, la aplicación se oculta en la bandeja del sistema para seguir trabajando en segundo plano.
 * **Acceso desde el lector (`Windows + B`):**
@@ -176,12 +204,14 @@ Para no saturar el rendimiento del disco ni el ancho de banda de red, SyncAccesi
 
 ---
 
-## 13. Tabla Completa de Atajos de Teclado
+## 14. Tabla Completa de Atajos de Teclado
 
 | Atajo | Función |
 | :--- | :--- |
 | **Shift + F1** | **Abrir la ventana rápida con todos los Atajos de Teclado** |
 | **F1** | **Abrir el Manual de Usuario en HTML (navegable en navegador web)** |
+| **Ctrl + U** | **Buscar Actualizaciones de SyncAccesible en línea** |
+| **Ctrl + D / F2** | **Abrir Ficha de Atributos del elemento (tabla vertical accesible)** |
 | **F5** | Comparar el par de carpetas seleccionado |
 | **F6** | Sincronizar el par seleccionado |
 | **F7** | Sincronizar en serie los pares seleccionados (uno tras otro) |
@@ -209,7 +239,7 @@ Para no saturar el rendimiento del disco ni el ancho de banda de red, SyncAccesi
 
 ---
 
-## 14. Créditos
+## 15. Créditos
 
 * **Desarrollo y Diseño de Accesibilidad:** José Manuel Fernández Cortés  
 * **Año:** 2026  

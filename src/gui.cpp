@@ -6,6 +6,7 @@
 #include "speech.h"
 #include "dialogs.h"
 #include "logger.h"
+#include "updater.h"
 
 #include <commctrl.h>
 #include <shellapi.h>
@@ -23,6 +24,7 @@
 #define WM_SYNC_PROGRESS (WM_USER + 4)
 #define WM_SEQ_STEP_DONE (WM_USER + 5)
 #define WM_SEQ_ALL_DONE  (WM_USER + 6)
+#define WM_APP_NEW_UPDATE (WM_USER + 50)
 
 #define ID_TRAY_RESTORE 3001
 #define ID_TRAY_SYNC_ALL 3002
@@ -65,10 +67,12 @@
 #define IDM_VIEW_SORT_ACTION          2044
 #define IDM_VIEW_SORT_NAME            2045
 #define IDM_VIEW_SORT_SIZE            2046
+#define IDM_VIEW_PROPERTIES           2047
 
 #define IDM_HELP_MANUAL               2050
 #define IDM_HELP_ABOUT                2051
 #define IDM_HELP_SHORTCUTS            2052
+#define IDM_HELP_CHECK_UPDATES        2053
 
 #define IDC_BTN_COMPARE       1001
 #define IDC_BTN_SYNC          1002
@@ -215,9 +219,11 @@ static void AnnounceVirtualColumn(HWND hList, int rowIndex, int colIndex, bool i
 
     if (g_hStatusBar) {
         SendMessageW(g_hStatusBar, SB_SETTEXTW, 0, (LPARAM)speech.c_str());
+        NotifyWinEvent(EVENT_OBJECT_NAMECHANGE, g_hStatusBar, OBJID_CLIENT, CHILDID_SELF);
     }
 
     Speech::Speak(speech, true);
+    NotifyWinEvent(EVENT_OBJECT_NAMECHANGE, hList, OBJID_CLIENT, rowIndex + 1);
 }
 
 static LRESULT CALLBACK VirtualColumnSubclassProc(
@@ -437,6 +443,65 @@ static void UpdatePreviewList() {
 }
 
 static std::vector<int> GetSelectedPairIndices();
+
+static void ShowSelectedProperties(HWND hwndParent) {
+    int curTab = TabCtrl_GetCurSel(g_hTab);
+    if (curTab == 0) {
+        // Folder Pairs
+        auto selList = GetSelectedPairIndices();
+        if (selList.empty()) {
+            Speech::Speak(L"Seleccione un par de carpetas para ver su ficha de atributos.");
+            return;
+        }
+        int sel = selList[0];
+        const auto& pair = g_currentProject.pairs[sel];
+        std::vector<std::pair<std::wstring, std::wstring>> props;
+        props.push_back({ L"Nombre del Par", pair.name });
+        props.push_back({ L"Carpeta de Origen (Izquierda)", pair.left_folder });
+        props.push_back({ L"Carpeta de Destino (Derecha)", pair.right_folder });
+        props.push_back({ L"Modo de Sincronización", SyncModeToString(pair.mode) });
+        props.push_back({ L"Tipo de Programación", ScheduleTypeToString(pair.schedule_type) });
+        if (pair.schedule_type == ScheduleType::Interval) {
+            props.push_back({ L"Intervalo de Ejecución", L"Cada " + std::to_wstring(pair.interval_minutes) + L" minutos" });
+        } else if (pair.schedule_type == ScheduleType::Daily) {
+            props.push_back({ L"Hora de Ejecución Diaria", pair.daily_time });
+        }
+        props.push_back({ L"Estado de Última Sincronización", pair.last_sync_status });
+        props.push_back({ L"Hora de Última Sincronización", pair.last_sync_time });
+        std::wstring excStr;
+        for (size_t i = 0; i < pair.exclusions.size(); ++i) {
+            excStr += pair.exclusions[i];
+            if (i + 1 < pair.exclusions.size()) excStr += L", ";
+        }
+        props.push_back({ L"Patrones Excluidos", excStr.empty() ? L"Ninguno" : excStr });
+        props.push_back({ L"Activado en el Proyecto", pair.enabled ? L"Sí (Activo)" : L"No (Pausado)" });
+
+        Dialogs::ShowItemPropertiesDialog(hwndParent, L"Ficha de Atributos: " + pair.name, props);
+    } else {
+        // Preview items
+        int sel = ListView_GetNextItem(g_hListPreview, -1, LVNI_SELECTED);
+        if (sel == -1 || sel >= (int)g_previewDisplayedIndices.size()) {
+            Speech::Speak(L"Seleccione un archivo de la vista previa para ver su ficha de atributos.");
+            return;
+        }
+        size_t actualIdx = g_previewDisplayedIndices[sel];
+        const auto& item = g_currentSummary.items[actualIdx];
+        std::vector<std::pair<std::wstring, std::wstring>> props;
+        props.push_back({ L"Archivo Relativo", item.rel_path });
+        props.push_back({ L"Acción Prevista", ActionTypeToString(item.action) });
+        props.push_back({ L"Tipo de Elemento", item.is_dir ? L"Carpeta" : L"Archivo" });
+        props.push_back({ L"Existe en Origen", item.left_exists ? L"Sí" : L"No" });
+        props.push_back({ L"Existe en Destino", item.right_exists ? L"Sí" : L"No" });
+        props.push_back({ L"Tamaño en Origen", item.left_exists ? (item.is_dir ? L"<Carpeta>" : FormatFileSize(item.left_size)) : L"No existe" });
+        props.push_back({ L"Tamaño en Destino", item.right_exists ? (item.is_dir ? L"<Carpeta>" : FormatFileSize(item.right_size)) : L"No existe" });
+        props.push_back({ L"Estado de la Sincronización", item.status });
+        if (!item.error_msg.empty()) {
+            props.push_back({ L"Detalle de Error", item.error_msg });
+        }
+
+        Dialogs::ShowItemPropertiesDialog(hwndParent, L"Ficha de Atributos: " + item.rel_path, props);
+    }
+}
 
 static void ExportSummaryReport() {
     if (g_currentSummary.items.empty()) {
@@ -1004,6 +1069,8 @@ static void ShowPairsContextMenu(HWND hwnd, int x, int y) {
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_EDIT_ADD_PAIR, L"&Añadir Nuevo Par de Carpetas...\tCtrl+N");
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_EDIT_DEL_PAIR, L"&Eliminar Par de Carpetas\tSupr");
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, nullptr);
+    InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_VIEW_PROPERTIES, L"&Ver Ficha de Atributos...\tCtrl+D");
+    InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, nullptr);
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_PAIR_OPEN_LEFT_EXPLORER, L"Abrir Carpeta &Origen en Explorador");
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_PAIR_OPEN_RIGHT_EXPLORER, L"Abrir Carpeta &Destino en Explorador");
 
@@ -1059,6 +1126,8 @@ static void ShowPreviewContextMenu(HWND hwnd, int x, int y) {
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, nullptr);
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_STRING | (g_filterShowOnlyChanges ? MF_CHECKED : MF_UNCHECKED), IDM_VIEW_FILTER_CHANGES, L"&Mostrar solo archivos con cambios (Ocultar idénticos)\tCtrl+H");
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_VIEW_SORT_ACTION, L"&Ordenar por Acción (Copias y eliminaciones primero)\tAlt+O");
+    InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, nullptr);
+    InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_VIEW_PROPERTIES, L"&Ver Ficha de Atributos...\tCtrl+D");
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, nullptr);
     InsertMenuW(hMenu, -1, MF_BYPOSITION | MF_STRING, IDM_PROJECT_EXPORT_TXT, L"&Exportar Informe de Resultados a TXT...\tCtrl+P");
 
@@ -1129,6 +1198,8 @@ static HMENU CreateAppMenuBar() {
     AppendMenuW(hMenuSort, MF_STRING, IDM_VIEW_SORT_NAME, L"Por &Nombre de archivo");
     AppendMenuW(hMenuSort, MF_STRING, IDM_VIEW_SORT_SIZE, L"Por &Tamaño");
     AppendMenuW(hMenuVer, MF_POPUP, (UINT_PTR)hMenuSort, L"&Ordenar Vista Previa");
+    AppendMenuW(hMenuVer, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(hMenuVer, MF_STRING, IDM_VIEW_PROPERTIES, L"&Ficha de Atributos del Elemento...\tCtrl+D");
 
     AppendMenuW(hMenuBar, MF_POPUP, (UINT_PTR)hMenuVer, L"&Ver");
 
@@ -1141,6 +1212,8 @@ static HMENU CreateAppMenuBar() {
 
     // Menu Ayuda
     HMENU hMenuHelp = CreatePopupMenu();
+    AppendMenuW(hMenuHelp, MF_STRING, IDM_HELP_CHECK_UPDATES, L"&Buscar Actualizaciones...\tCtrl+U");
+    AppendMenuW(hMenuHelp, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(hMenuHelp, MF_STRING, IDM_HELP_SHORTCUTS, L"&Atajos de Teclado...\tShift+F1");
     AppendMenuW(hMenuHelp, MF_STRING, IDM_HELP_MANUAL, L"&Manual de Usuario (HTML)...\tF1");
     AppendMenuW(hMenuHelp, MF_SEPARATOR, 0, nullptr);
@@ -1287,6 +1360,8 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
                 SwitchTab(cur);
             } else if (pnm->idFrom == IDC_LIST_PAIRS && (pnm->code == NM_DBLCLK || pnm->code == NM_RETURN)) {
                 EditPair();
+            } else if (pnm->idFrom == IDC_LIST_PREVIEW && (pnm->code == NM_DBLCLK || pnm->code == NM_RETURN)) {
+                ShowSelectedProperties(hwnd);
             } else if (pnm->idFrom == IDC_LIST_PREVIEW && pnm->code == LVN_COLUMNCLICK) {
                 NMLISTVIEW* pnmv = (NMLISTVIEW*)lParam;
                 if (pnmv->iSubItem == 0) {
@@ -1502,6 +1577,10 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
                     Logger::OpenLogInDefaultEditor(hwnd);
                     break;
 
+                case IDM_VIEW_PROPERTIES:
+                    ShowSelectedProperties(hwnd);
+                    break;
+
                 case IDM_HELP_SHORTCUTS:
                     Dialogs::ShowShortcutsDialog(hwnd);
                     break;
@@ -1511,6 +1590,9 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
                     break;
                 case IDM_HELP_ABOUT:
                     Dialogs::ShowAboutDialog(hwnd);
+                    break;
+                case IDM_HELP_CHECK_UPDATES:
+                    Updater::CheckForUpdates(hwnd, false);
                     break;
 
                 case ID_TRAY_RESTORE:
@@ -1526,6 +1608,15 @@ static LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
                 case ID_TRAY_EXIT:
                     DestroyWindow(hwnd);
                     break;
+            }
+            return 0;
+        }
+
+        case WM_APP_NEW_UPDATE: {
+            Updater::UpdateInfo* pInfo = (Updater::UpdateInfo*)lParam;
+            if (pInfo) {
+                Dialogs::ShowUpdateDialog(hwnd, pInfo);
+                delete pInfo;
             }
             return 0;
         }
@@ -1776,6 +1867,9 @@ int Run(HINSTANCE hInstance, int nCmdShow) {
         UpdateWindow(hwnd);
     }
 
+    // Comprobación silenciosa de actualizaciones en segundo plano
+    Updater::CheckForUpdates(hwnd, true);
+
     // Keyboard Accelerators table
     ACCEL accels[] = {
         { FSHIFT | FVIRTKEY, VK_F1, IDM_HELP_SHORTCUTS },
@@ -1801,7 +1895,10 @@ int Run(HINSTANCE hInstance, int nCmdShow) {
         { FCONTROL | FVIRTKEY, '2', IDM_VIEW_TAB_PREVIEW },
         { FCONTROL | FVIRTKEY, 'P', IDM_PROJECT_EXPORT_TXT },
         { FCONTROL | FVIRTKEY, 'H', IDM_VIEW_FILTER_CHANGES },
-        { FALT | FVIRTKEY, 'O', IDM_VIEW_SORT_ACTION }
+        { FALT | FVIRTKEY, 'O', IDM_VIEW_SORT_ACTION },
+        { FCONTROL | FVIRTKEY, 'U', IDM_HELP_CHECK_UPDATES },
+        { FCONTROL | FVIRTKEY, 'D', IDM_VIEW_PROPERTIES },
+        { FVIRTKEY, VK_F2, IDM_VIEW_PROPERTIES }
     };
     HACCEL hAccel = CreateAcceleratorTableW(accels, sizeof(accels) / sizeof(ACCEL));
 
@@ -1818,6 +1915,15 @@ int Run(HINSTANCE hInstance, int nCmdShow) {
                 continue;
             } else if (msg.message == WM_KEYDOWN && msg.wParam == VK_F1 && !ctrlDown && !altDown && !shiftDown) {
                 Dialogs::OpenManualHtml(hwnd);
+                continue;
+            } else if (ctrlDown && !altDown && !shiftDown && (msg.wParam == 'U' || msg.wParam == 'u')) {
+                Updater::CheckForUpdates(hwnd, false);
+                continue;
+            } else if (ctrlDown && !altDown && !shiftDown && (msg.wParam == 'D' || msg.wParam == 'd')) {
+                ShowSelectedProperties(hwnd);
+                continue;
+            } else if (msg.message == WM_KEYDOWN && msg.wParam == VK_F2 && !ctrlDown && !altDown && !shiftDown) {
+                ShowSelectedProperties(hwnd);
                 continue;
             } else if (ctrlDown && !altDown && !shiftDown && (msg.wParam == 'P' || msg.wParam == 'p')) {
                 ExportSummaryReport();
