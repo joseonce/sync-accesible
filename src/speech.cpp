@@ -1,30 +1,18 @@
 #include "speech.h"
-#include <sapi.h>
 #include <oleauto.h>
 #include <mutex>
 #include <thread>
 #include <atomic>
-#include <vector>
-#include <mmsystem.h>
+#include <chrono>
 
 namespace Speech {
 
-static const GUID MY_CLSID_SpVoice = { 0x96749377, 0x3391, 0x11D2, { 0x9E, 0xE3, 0x00, 0xC0, 0x4F, 0x79, 0x73, 0x96 } };
-static const GUID MY_IID_ISpVoice   = { 0x6C44DF74, 0x72B9, 0x4992, { 0xA1, 0xEC, 0xEF, 0x99, 0x66, 0x9F, 0xA5, 0x66 } };
-
-// NVDA
+// NVDA Controller Client (64-bit)
 typedef error_status_t (__stdcall *NvdaSpeakFunc)(const wchar_t*);
 typedef error_status_t (__stdcall *NvdaCancelFunc)();
 static HMODULE hNvdaDll = nullptr;
 static NvdaSpeakFunc nvdaSpeak = nullptr;
 static NvdaCancelFunc nvdaCancel = nullptr;
-
-// JAWS (jfwapi.dll fallback)
-typedef BOOL (WINAPI *JfwSayStringFunc)(LPCTSTR, BOOL);
-typedef BOOL (WINAPI *JfwRunFunctionFunc)(LPCTSTR);
-static HMODULE hJfwDll = nullptr;
-static JfwSayStringFunc jfwSayString = nullptr;
-static JfwRunFunctionFunc jfwRunFunction = nullptr;
 
 // Dolphin SuperNova
 typedef void (__stdcall *DolCommandFunc)(const wchar_t*, int, int);
@@ -39,7 +27,7 @@ static std::atomic<bool> g_waitingBeepRunning(false);
 static std::thread g_waitingBeepThread;
 
 // -------------------------------------------------------------
-// JAWS COM Helper
+// JAWS COM Dispatch (FreedomSci.JawsApi)
 // -------------------------------------------------------------
 static bool JawsComSpeak(const std::wstring& text, bool interrupt) {
     CLSID clsid;
@@ -61,17 +49,19 @@ static bool JawsComSpeak(const std::wstring& text, bool interrupt) {
         return false;
     }
 
+    // Prepend leading spaces like accessible_output2 to prevent JAWS swallowing start of word
+    std::wstring speechText = L"      " + text;
+
     VARIANTARG args[2];
     VariantInit(&args[0]);
     VariantInit(&args[1]);
 
-    // IDispatch::Invoke takes parameters in reverse order:
-    // SayString(BSTR text, VARIANT_BOOL bFlush)
+    // IDispatch::Invoke parameters in reverse order: SayString(BSTR text, VARIANT_BOOL bFlush)
     args[0].vt = VT_BOOL;
     args[0].boolVal = interrupt ? VARIANT_TRUE : VARIANT_FALSE;
 
     args[1].vt = VT_BSTR;
-    args[1].bstrVal = SysAllocString(text.c_str());
+    args[1].bstrVal = SysAllocString(speechText.c_str());
 
     DISPPARAMS params = { args, nullptr, 2, 0 };
     VARIANT vResult;
@@ -79,7 +69,61 @@ static bool JawsComSpeak(const std::wstring& text, bool interrupt) {
 
     hr = pJaws->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, &vResult, nullptr, nullptr);
     SysFreeString(args[1].bstrVal);
+
+    bool spoken = false;
+    // When JAWS is running and speaks, SayString returns VARIANT_TRUE (-1)
+    if (SUCCEEDED(hr) && vResult.vt == VT_BOOL && vResult.boolVal == VARIANT_TRUE) {
+        spoken = true;
+    }
+    VariantClear(&vResult);
     pJaws->Release();
+
+    return spoken;
+}
+
+// -------------------------------------------------------------
+// SAPI 5 COM Dispatch (SAPI.SpVoice)
+// -------------------------------------------------------------
+static bool SapiSpeak(const std::wstring& text, bool interrupt) {
+    CLSID clsid;
+    if (FAILED(CLSIDFromProgID(L"SAPI.SpVoice", &clsid))) {
+        return false;
+    }
+
+    IDispatch* pVoice = nullptr;
+    HRESULT hr = CoCreateInstance(clsid, nullptr, CLSCTX_ALL, IID_IDispatch, (void**)&pVoice);
+    if (FAILED(hr) || !pVoice) {
+        return false;
+    }
+
+    DISPID dispid = 0;
+    OLECHAR* szName = (OLECHAR*)L"Speak";
+    hr = pVoice->GetIDsOfNames(IID_NULL, &szName, 1, LOCALE_USER_DEFAULT, &dispid);
+    if (FAILED(hr)) {
+        pVoice->Release();
+        return false;
+    }
+
+    VARIANTARG args[2];
+    VariantInit(&args[0]);
+    VariantInit(&args[1]);
+
+    // Speak(BSTR pwcs, SpeechVoiceSpeakFlags dwFlags)
+    // SVSFlagsAsync = 1, SVSFPurgeBeforeSpeak = 2
+    args[0].vt = VT_I4;
+    args[0].lVal = interrupt ? (1 | 2) : 1;
+
+    args[1].vt = VT_BSTR;
+    args[1].bstrVal = SysAllocString(text.c_str());
+
+    DISPPARAMS dp = { args, nullptr, 2, 0 };
+    VARIANT res;
+    VariantInit(&res);
+
+    hr = pVoice->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &dp, &res, nullptr, nullptr);
+    SysFreeString(args[1].bstrVal);
+    VariantClear(&res);
+    pVoice->Release();
 
     return SUCCEEDED(hr);
 }
@@ -88,9 +132,10 @@ static bool JawsComSpeak(const std::wstring& text, bool interrupt) {
 // Screen Reader Detection
 // -------------------------------------------------------------
 bool IsJawsActive() {
-    if (FindWindowW(L"JFWUI2", L"JAWS") != nullptr) return true;
-    if (FindWindowW(L"JFWUI2", nullptr) != nullptr) return true;
-    return false;
+    CoInitialize(nullptr);
+    bool active = JawsComSpeak(L"", false);
+    CoUninitialize();
+    return active;
 }
 
 bool IsNvdaActive() {
@@ -111,34 +156,23 @@ bool IsScreenReaderActive() {
 // Initialization & Shutdown
 // -------------------------------------------------------------
 void Initialize() {
-    // 1. Try NVDA Controller Client DLL
     wchar_t exePath[MAX_PATH];
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
     std::wstring dir = exePath;
     size_t lastSlash = dir.find_last_of(L"\\/");
     if (lastSlash != std::wstring::npos) dir = dir.substr(0, lastSlash);
 
+    // Try 64-bit NVDA Controller Client DLL if present
     std::wstring dll64 = dir + L"\\nvdaControllerClient64.dll";
-    std::wstring dll32 = dir + L"\\nvdaControllerClient32.dll";
-
     hNvdaDll = LoadLibraryW(dll64.c_str());
     if (!hNvdaDll) hNvdaDll = LoadLibraryW(L"nvdaControllerClient64.dll");
-    if (!hNvdaDll) hNvdaDll = LoadLibraryW(dll32.c_str());
-    if (!hNvdaDll) hNvdaDll = LoadLibraryW(L"nvdaControllerClient.dll");
 
     if (hNvdaDll) {
         nvdaSpeak = (NvdaSpeakFunc)GetProcAddress(hNvdaDll, "nvdaController_speakText");
         nvdaCancel = (NvdaCancelFunc)GetProcAddress(hNvdaDll, "nvdaController_cancelSpeech");
     }
 
-    // 2. Try JAWS jfwapi.dll
-    hJfwDll = LoadLibraryW(L"jfwapi.dll");
-    if (hJfwDll) {
-        jfwSayString = (JfwSayStringFunc)GetProcAddress(hJfwDll, "JFW_SayString");
-        jfwRunFunction = (JfwRunFunctionFunc)GetProcAddress(hJfwDll, "JFW_RunFunction");
-    }
-
-    // 3. Try Dolphin dolapi.dll
+    // Try Dolphin dolapi.dll if present
     hDolDll = LoadLibraryW(L"dolapi.dll");
     if (hDolDll) {
         dolCommand = (DolCommandFunc)GetProcAddress(hDolDll, "DolAccess_Command");
@@ -155,12 +189,6 @@ void Shutdown() {
         hNvdaDll = nullptr;
         nvdaSpeak = nullptr;
         nvdaCancel = nullptr;
-    }
-    if (hJfwDll) {
-        FreeLibrary(hJfwDll);
-        hJfwDll = nullptr;
-        jfwSayString = nullptr;
-        jfwRunFunction = nullptr;
     }
     if (hDolDll) {
         FreeLibrary(hDolDll);
@@ -190,7 +218,7 @@ void Speak(const std::wstring& text, bool interrupt) {
             std::lock_guard<std::mutex> lock(speechMutex);
             bool spoken = false;
 
-            // 1. Try NVDA
+            // 1. Try NVDA if DLL is loaded
             if (nvdaSpeak) {
                 if (interrupt && nvdaCancel) {
                     nvdaCancel();
@@ -200,36 +228,23 @@ void Speak(const std::wstring& text, bool interrupt) {
                 }
             }
 
-            // 2. Try JAWS (COM Automation or jfwapi.dll)
+            // 2. Try JAWS via FreedomSci.JawsApi COM automation
             if (!spoken) {
-                if (IsJawsActive() || jfwSayString != nullptr) {
-                    if (jfwSayString && jfwSayString(text.c_str(), interrupt ? TRUE : FALSE)) {
-                        spoken = true;
-                    } else if (JawsComSpeak(text, interrupt)) {
-                        spoken = true;
-                    }
+                if (JawsComSpeak(text, interrupt)) {
+                    spoken = true;
                 }
             }
 
-            // 3. Try Dolphin SuperNova
+            // 3. Try Dolphin SuperNova if DLL is loaded
             if (!spoken && dolCommand) {
                 if (interrupt && dolAction) dolAction(141);
                 dolCommand(text.c_str(), (int)((text.size() * 2) + 2), 1);
                 spoken = true;
             }
 
-            // 4. Try SAPI 5 fallback (Voice created on this thread to avoid apartment violation)
+            // 4. SAPI 5 fallback (Works with Windows Narrator, System Speech, or standalone)
             if (!spoken) {
-                ISpVoice* pLocalVoice = nullptr;
-                HRESULT hr = CoCreateInstance(MY_CLSID_SpVoice, NULL, CLSCTX_ALL, MY_IID_ISpVoice, (void**)&pLocalVoice);
-                if (SUCCEEDED(hr) && pLocalVoice) {
-                    DWORD flags = SPF_DEFAULT;
-                    if (interrupt) {
-                        flags |= SPF_PURGEBEFORESPEAK;
-                    }
-                    pLocalVoice->Speak(text.c_str(), flags, nullptr);
-                    pLocalVoice->Release();
-                }
+                SapiSpeak(text, interrupt);
             }
         }
         CoUninitialize();

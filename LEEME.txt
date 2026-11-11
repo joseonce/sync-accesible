@@ -17,3 +17,4 @@ INSTRUCCIONES DE USO:
 6. Compatible con NVDA, JAWS, Dolphin SuperNova y Narrador de Windows.
 
 ========================================================================
+

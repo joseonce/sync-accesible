@@ -5,6 +5,26 @@
 #include "logger.h"
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow) {
+    // Single instance detection: si ya está abierta o minimizada en la bandeja, restaurar y enfocar
+    HANDLE hSingleMutex = CreateMutexW(nullptr, TRUE, L"Local\\SyncAccesible_SingleInstance_Mutex_2026");
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        HWND hExisting = FindWindowW(L"SyncAccesibleMainWindowClass", nullptr);
+        if (!hExisting) {
+            // Intentar buscar de nuevo durante 500ms por si estaba terminando de registrar la clase
+            for (int i = 0; i < 5 && !hExisting; ++i) {
+                Sleep(100);
+                hExisting = FindWindowW(L"SyncAccesibleMainWindowClass", nullptr);
+            }
+        }
+        if (hExisting) {
+            ShowWindow(hExisting, SW_RESTORE);
+            SetForegroundWindow(hExisting);
+            PostMessageW(hExisting, WM_COMMAND, MAKEWPARAM(3001, 0), 0); // ID_TRAY_RESTORE
+        }
+        if (hSingleMutex) CloseHandle(hSingleMutex);
+        return 0;
+    }
+
     // Get application directory
     wchar_t exePath[MAX_PATH];
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
@@ -37,6 +57,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     CoUninitialize();
     LOG_INFO(L"Cerrando aplicación SyncAccesible");
     Logger::Shutdown();
+    if (hSingleMutex) CloseHandle(hSingleMutex);
     return result;
 }
 
